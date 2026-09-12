@@ -1,0 +1,3 @@
+model_no,name,category,brand,size,material,finish,mrp,selling_price,description,features,status,catalogue_enabled,image_filename
+RM-PC101,Prime Pillar Cock,Faucets,RAMONI,15 mm,Brass,Chrome,1299,999,Premium brass body pillar cock,"Smooth operation;Durable finish",active,true,RM-PC101-1.jpg
+RM-BC204,Classic Bib Cock,Faucets,RAMONI,15 mm,Brass,Chrome,899,699,Reliable everyday bib cock,"Easy installation;Long life",active,true,RM-BC204-1.jpg
