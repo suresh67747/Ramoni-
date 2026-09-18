@@ -22,7 +22,7 @@ drop policy if exists "Authenticated users manage brands" on public.brands;
 create policy "Authenticated users manage brands" on public.brands for all to authenticated using (true) with check (true);
 
 drop policy if exists "Public can read catalogue products" on public.products;
-create policy "Public can read catalogue products" on public.products for select using (catalogue_enabled = true or status = 'active');
+create policy "Public can read catalogue products" on public.products for select using (catalogue_enabled = true and status = 'active');
 
 drop policy if exists "Authenticated users manage products" on public.products;
 create policy "Authenticated users manage products" on public.products for all to authenticated using (true) with check (true);
