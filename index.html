@@ -15,25 +15,132 @@
 <main class="main"><header class="top"><input id="search" class="search" placeholder="Search products, model no., categories..."/><div class="top-right"><button class="bell">🔔</button><div class="user"><div class="avatar">SP</div><div><b style="font-size:12px">Suresh Patel</b><div style="font-size:10px;color:#8795a8">Administrator</div></div></div></div></header>
 <section class="content" id="appContent"></section></main></div>
 <div class="modal" id="productModal"><div class="modal-card"><div class="modal-head"><h2>Add Product</h2><button class="close" id="closeModal">×</button></div><form class="form" id="productForm"><div class="field"><label>Product Name *</label><input id="fName" required placeholder="e.g. Swan Basin Mixer"/></div><div class="field"><label>Model No. *</label><input id="fModel" required placeholder="e.g. RM-101"/></div><div class="field"><label>Category</label><select id="fCategory"><option>Faucets</option><option>Sanitaryware</option><option>Showers</option><option>Accessories</option><option>Kitchen</option></select></div><div class="field"><label>Brand</label><input id="fBrand" value="RAMONI"/></div><div class="field"><label>Size</label><input id="fSize" placeholder="e.g. 15 mm"/></div><div class="field"><label>Finish</label><input id="fFinish" placeholder="e.g. Chrome"/></div><div class="field"><label>MRP (₹)</label><input id="fPrice" type="number" placeholder="0"/></div><div class="field"><label>Image URL</label><input id="fImage" placeholder="https://..."/></div><div class="field full"><label>Description</label><textarea id="fDesc" placeholder="Product description, features and specifications..."></textarea></div><div class="form-foot field full"><button type="button" class="secondary" id="cancelModal">Cancel</button><button class="primary">Save Product</button></div></form></div></div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+<script src="./supabase-client.js"></script>
 <script>
-const seed=[{id:1,name:'Prime Pillar Cock',model:'RM-PC101',category:'Faucets',brand:'RAMONI',size:'15 mm',finish:'Chrome',price:1299,image:'',desc:'Premium brass body pillar cock with smooth operation.'},{id:2,name:'Classic Bib Cock',model:'RM-BC204',category:'Faucets',brand:'RAMONI',size:'15 mm',finish:'Chrome',price:899,image:'',desc:'Reliable everyday bib cock with premium finish.'},{id:3,name:'Rainfall Shower',model:'RM-SH310',category:'Showers',brand:'RAMONI',size:'200 mm',finish:'Chrome',price:2499,image:'',desc:'Wide rain shower designed for a comfortable bathing experience.'},{id:4,name:'Health Faucet',model:'RM-HF115',category:'Accessories',brand:'RAMONI',size:'1.2 m',finish:'Chrome',price:1099,image:'',desc:'Flexible health faucet with durable braided hose.'},{id:5,name:'Angle Cock',model:'RM-AC120',category:'Faucets',brand:'RAMONI',size:'15 mm',finish:'Chrome',price:749,image:'',desc:'Compact angle cock for modern bathroom installations.'},{id:6,name:'Counter Basin',model:'RM-CB500',category:'Sanitaryware',brand:'RAMONI',size:'500 mm',finish:'White',price:5499,image:'',desc:'Contemporary counter-top basin with clean geometry.'}];
-let products=JSON.parse(localStorage.getItem('ramoni_products')||'null')||seed;let view='dashboard';let selected=products[0];
+const seed=[
+ {id:1,name:'Prime Pillar Cock',model:'RM-PC101',category:'Faucets',brand:'RAMONI',size:'15 mm',finish:'Chrome',price:1299,image:'',desc:'Premium brass body pillar cock with smooth operation.'},
+ {id:2,name:'Classic Bib Cock',model:'RM-BC204',category:'Faucets',brand:'RAMONI',size:'15 mm',finish:'Chrome',price:899,image:'',desc:'Reliable everyday bib cock with premium finish.'},
+ {id:3,name:'Rainfall Shower',model:'RM-SH310',category:'Showers',brand:'RAMONI',size:'200 mm',finish:'Chrome',price:2499,image:'',desc:'Wide rain shower designed for a comfortable bathing experience.'},
+ {id:4,name:'Health Faucet',model:'RM-HF115',category:'Accessories',brand:'RAMONI',size:'1.2 m',finish:'Chrome',price:1099,image:'',desc:'Flexible health faucet with durable braided hose.'},
+ {id:5,name:'Angle Cock',model:'RM-AC120',category:'Faucets',brand:'RAMONI',size:'15 mm',finish:'Chrome',price:749,image:'',desc:'Compact angle cock for modern bathroom installations.'},
+ {id:6,name:'Counter Basin',model:'RM-CB500',category:'Sanitaryware',brand:'RAMONI',size:'500 mm',finish:'White',price:5499,image:'',desc:'Contemporary counter-top basin with clean geometry.'}
+];
+
+let products=JSON.parse(localStorage.getItem('ramoni_products')||'null')||seed;
+let view='dashboard', selected=products[0], cloudReady=!!window.ramoniSupabase, cloudMessage='';
 const content=document.getElementById('appContent');
-function save(){localStorage.setItem('ramoni_products',JSON.stringify(products))}
-function productCard(p){return `<article class="product"><div class="pic">${p.image?`<img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}">`:'<div class="placeholder">◇</div>'}<span class="badge">ACTIVE</span></div><div class="product-body"><h4>${escapeHtml(p.name)}</h4><div class="model">${escapeHtml(p.model)} · ${escapeHtml(p.category)}</div><div class="price">₹${Number(p.price||0).toLocaleString('en-IN')}</div><div class="product-actions"><button onclick="selectProduct(${p.id})">View</button><button onclick="editProduct(${p.id})">Edit</button></div></div></article>`}
-function dashboard(){return `<div class="page-head"><div><div class="eyebrow">RAMONI Catalogue</div><h1>Good afternoon, Suresh</h1><p>Manage products and build your next professional catalogue.</p></div><button class="primary" onclick="openModal()">＋ Add Product</button></div><div class="stats"><div class="stat"><div class="stat-top"><span>Total Products</span><span>◫</span></div><h2>${products.length}</h2><span class="delta">↑ Catalogue ready</span></div><div class="stat"><div class="stat-top"><span>Categories</span><span>◈</span></div><h2>${new Set(products.map(p=>p.category)).size}</h2><span class="delta">Organised</span></div><div class="stat"><div class="stat-top"><span>Brands</span><span>◆</span></div><h2>${new Set(products.map(p=>p.brand)).size}</h2><span class="delta">Managed</span></div><div class="stat"><div class="stat-top"><span>Catalogue Items</span><span>▤</span></div><h2>${products.length}</h2><span class="delta">Ready to publish</span></div></div><div class="layout"><div class="panel"><div class="panel-head"><h3>Product Collection</h3><button class="secondary" onclick="setView('products')">View all</button></div><div class="filters"><select id="catFilter" onchange="render()"><option value="">All categories</option>${[...new Set(products.map(p=>p.category))].map(c=>`<option>${escapeHtml(c)}</option>`).join('')}</select><select id="sortFilter" onchange="render()"><option value="new">Latest</option><option value="price">Price: high to low</option><option value="name">Name A-Z</option></select></div><div class="products">${filteredProducts().slice(0,6).map(productCard).join('')||'<div class="empty">No products found.</div>'}</div></div><div class="panel"><div class="panel-head"><h3>Product Details</h3></div>${details()}</div></div>`}
-function productsView(){return `<div class="page-head"><div><div class="eyebrow">Product Master</div><h1>Products</h1><p>Maintain your complete RAMONI product database.</p></div><div style="display:flex;gap:8px"><button class="secondary" onclick="alert('Bulk Upload module is prepared for Excel/CSV integration in the next production step.')">⇧ Bulk Upload</button><button class="primary" onclick="openModal()">＋ Add Product</button></div></div><div class="panel"><div class="filters"><input id="productSearch" class="search" style="width:280px" placeholder="Search products..." oninput="render()"><select id="catFilter" onchange="render()"><option value="">All categories</option>${[...new Set(products.map(p=>p.category))].map(c=>`<option>${escapeHtml(c)}</option>`).join('')}</select></div><div class="products">${filteredProducts().map(productCard).join('')||'<div class="empty">No products found.</div>'}</div></div>`}
-function details(){if(!selected)return '<div class="details"><div class="empty">Select a product</div></div>';return `<div class="details"><div class="detail-image">${selected.image?`<img src="${escapeHtml(selected.image)}" alt="">`:'<div class="placeholder">◇</div>'}</div><h2>${escapeHtml(selected.name)}</h2><div class="detail-muted">${escapeHtml(selected.model)} · ${escapeHtml(selected.brand)}</div><div class="specs"><div class="spec"><span>Category</span><b>${escapeHtml(selected.category)}</b></div><div class="spec"><span>Size</span><b>${escapeHtml(selected.size||'—')}</b></div><div class="spec"><span>Finish</span><b>${escapeHtml(selected.finish||'—')}</b></div><div class="spec"><span>MRP</span><b>₹${Number(selected.price||0).toLocaleString('en-IN')}</b></div></div><div class="notice">${escapeHtml(selected.desc||'No description added yet.')}</div><button class="primary" style="width:100%;margin-top:14px" onclick="setView('catalogue')">Add to Catalogue</button></div>`}
-function generic(title,sub,action=''){return `<div class="page-head"><div><div class="eyebrow">RAMONI Workspace</div><h1>${title}</h1><p>${sub}</p></div>${action}</div><div class="panel"><div class="empty" style="padding:70px">${title} workspace is ready for production data integration.<br><button class="primary" style="margin-top:16px" onclick="openModal()">＋ Add Product</button></div></div>`}
-function filteredProducts(){let q=(document.getElementById('productSearch')?.value||document.getElementById('search')?.value||'').toLowerCase();let cat=document.getElementById('catFilter')?.value||'';let a=products.filter(p=>(!q||`${p.name} ${p.model} ${p.category} ${p.brand}`.toLowerCase().includes(q))&&(!cat||p.category===cat));let sort=document.getElementById('sortFilter')?.value;if(sort==='price')a.sort((x,y)=>y.price-x.price);if(sort==='name')a.sort((x,y)=>x.name.localeCompare(y.name));return a}
-function render(){content.innerHTML=view==='dashboard'?dashboard():view==='products'?productsView():view==='catalogue'?generic('Catalogue Builder','Select, arrange and publish products into a premium catalogue PDF.','<button class="primary" onclick="alert(\'Catalogue generation will be connected to the production PDF engine.\')">Create Catalogue</button>'):view==='categories'?generic('Categories','Organise your catalogue by product families.'):view==='brands'?generic('Brands','Manage brand identity and product ownership.'):view==='prices'?generic('Price List','Manage MRP and selling-price data.'):view==='customers'?generic('Customers','Keep customer and dealer records in one place.'):view==='enquiries'?generic('Enquiries','Track catalogue enquiries and follow-ups.'):view==='reports'?generic('Reports','Review catalogue and product activity.'):generic('Settings','Configure company, catalogue and administrator settings.');}
-function setView(v){view=v;document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));render()}
-function selectProduct(id){selected=products.find(p=>p.id===id)||selected;render()}
-function editProduct(id){let p=products.find(x=>x.id===id);if(!p)return;selected=p;openModal(true)}
-function openModal(edit=false){document.getElementById('productModal').classList.add('show');document.querySelector('.modal-head h2').textContent=edit?'Edit Product':'Add Product';let p=edit?selected:null;document.getElementById('fName').value=p?.name||'';document.getElementById('fModel').value=p?.model||'';document.getElementById('fCategory').value=p?.category||'Faucets';document.getElementById('fBrand').value=p?.brand||'RAMONI';document.getElementById('fSize').value=p?.size||'';document.getElementById('fFinish').value=p?.finish||'';document.getElementById('fPrice').value=p?.price||'';document.getElementById('fImage').value=p?.image||'';document.getElementById('fDesc').value=p?.desc||''}
-function closeModal(){document.getElementById('productModal').classList.remove('show')}
+
+function saveLocal(){localStorage.setItem('ramoni_products',JSON.stringify(products));}
+function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+function cats(){return [...new Set(products.map(p=>p.category).filter(Boolean))].sort();}
+function brands(){return [...new Set(products.map(p=>p.brand).filter(Boolean))].sort();}
+function filteredProducts(){
+ const q=(document.getElementById('productSearch')?.value||document.getElementById('search')?.value||'').toLowerCase();
+ const cat=document.getElementById('catFilter')?.value||'';
+ let a=products.filter(p=>(!q||`${p.name} ${p.model||''} ${p.category||''} ${p.brand||''}`.toLowerCase().includes(q))&&(!cat||p.category===cat));
+ const sort=document.getElementById('sortFilter')?.value;
+ if(sort==='price')a.sort((x,y)=>(y.price||0)-(x.price||0));
+ if(sort==='name')a.sort((x,y)=>(x.name||'').localeCompare(y.name||''));
+ return a;
+}
+function productCard(p,check=false){
+ return `<article class="product">
+ <div class="pic">${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:'<div class="placeholder">◇</div>'}<span class="badge">${p.data_complete?'READY':'INCOMPLETE'}</span></div>
+ <div class="product-body"><h4>${esc(p.name)}</h4><div class="model">${esc(p.model||'Model pending')} · ${esc(p.category||'Category pending')}</div>
+ <div class="price">${p.price?'₹'+Number(p.price).toLocaleString('en-IN'):'Price pending'}</div>
+ <div class="product-actions">${check?`<button onclick="toggleCatalogue('${p.id}')">${catalogueSet.has(String(p.id))?'✓ Selected':'＋ Select'}</button>`:''}<button onclick="selectProduct('${p.id}')">View</button><button onclick="editProduct('${p.id}')">Edit</button></div></div></article>`;
+}
+
+function details(){
+ if(!selected)return '<div class="details"><div class="empty">Select a product</div></div>';
+ return `<div class="details"><div class="detail-image">${selected.image?`<img src="${esc(selected.image)}" alt="">`:'<div class="placeholder">◇</div>'}</div>
+ <h2>${esc(selected.name)}</h2><div class="detail-muted">${esc(selected.model||'Model pending')} · ${esc(selected.brand||'Brand pending')}</div>
+ <div class="specs"><div class="spec"><span>Category</span><b>${esc(selected.category||'—')}</b></div><div class="spec"><span>Size</span><b>${esc(selected.size||'—')}</b></div><div class="spec"><span>Finish</span><b>${esc(selected.finish||'—')}</b></div><div class="spec"><span>MRP</span><b>${selected.price?'₹'+Number(selected.price).toLocaleString('en-IN'):'—'}</b></div></div>
+ <div class="notice">${esc(selected.desc||'Complete the remaining product details.')}</div>
+ <button class="primary" style="width:100%;margin-top:14px" onclick="setView('catalogue')">Add to Catalogue</button></div>`;
+}
+
+function dashboard(){
+ const incomplete=products.filter(p=>!p.data_complete).length;
+ return `<div class="page-head"><div><div class="eyebrow">RAMONI Catalogue</div><h1>Good afternoon, Suresh</h1><p>Manage products and build your professional catalogue.</p></div><button class="primary" onclick="openModal()">＋ Add Product</button></div>
+ <div class="stats"><div class="stat"><div class="stat-top"><span>Total Products</span><span>◫</span></div><h2>${products.length}</h2><span class="delta">Product master</span></div>
+ <div class="stat"><div class="stat-top"><span>Categories</span><span>◈</span></div><h2>${cats().length}</h2><span class="delta">Organised</span></div>
+ <div class="stat"><div class="stat-top"><span>Brands</span><span>◆</span></div><h2>${brands().length}</h2><span class="delta">Managed</span></div>
+ <div class="stat"><div class="stat-top"><span>Incomplete</span><span>!</span></div><h2>${incomplete}</h2><span class="delta">${incomplete?'Details pending':'All ready'}</span></div></div>
+ <div class="layout"><div class="panel"><div class="panel-head"><h3>Product Collection</h3><div style="display:flex;gap:8px"><button class="secondary" onclick="importExcel()">⇧ Import Excel</button><button class="secondary" onclick="setView('products')">View all</button></div></div>
+ <div class="filters"><select id="catFilter" onchange="render()"><option value="">All categories</option>${cats().map(c=>`<option>${esc(c)}</option>`).join('')}</select><select id="sortFilter" onchange="render()"><option value="new">Latest</option><option value="price">Price: high to low</option><option value="name">Name A-Z</option></select></div>
+ <div class="products">${filteredProducts().slice(0,6).map(p=>productCard(p)).join('')||'<div class="empty">No products found.</div>'}</div></div><div class="panel"><div class="panel-head"><h3>Product Details</h3></div>${details()}</div></div>
+ <div class="panel" style="margin-top:20px"><div class="panel-head"><h3>Quick Actions</h3></div><div style="padding:18px;display:flex;gap:10px;flex-wrap:wrap">
+ <button class="secondary" onclick="importExcel()">📊 Product Name Excel</button><button class="secondary" onclick="setView('catalogue')">📖 Catalogue Preview</button><button class="secondary" onclick="setView('products')">✎ Complete Details</button>
+ </div></div>${cloudMessage?`<div class="notice">${esc(cloudMessage)}</div>`:''}`;
+}
+
+function productsView(){
+ return `<div class="page-head"><div><div class="eyebrow">Product Master</div><h1>Products</h1><p>Add names first, then complete details gradually.</p></div>
+ <div style="display:flex;gap:8px"><button class="secondary" onclick="importExcel()">⇧ Bulk Excel</button><button class="primary" onclick="openModal()">＋ Add Product</button></div></div>
+ <div class="panel"><div class="filters"><input id="productSearch" class="search" style="width:280px" placeholder="Search products..." oninput="render()"><select id="catFilter" onchange="render()"><option value="">All categories</option>${cats().map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
+ <div class="products">${filteredProducts().map(p=>productCard(p)).join('')||'<div class="empty">No products found.</div>'}</div></div>`;
+}
+
+let catalogueSet=new Set(JSON.parse(localStorage.getItem('ramoni_catalogue_selection')||'[]'));
+function toggleCatalogue(id){id=String(id);catalogueSet.has(id)?catalogueSet.delete(id):catalogueSet.add(id);localStorage.setItem('ramoni_catalogue_selection',JSON.stringify([...catalogueSet]));render();}
+function catalogueView(){
+ const selectedProducts=products.filter(p=>catalogueSet.has(String(p.id)));
+ return `<div class="page-head"><div><div class="eyebrow">Customer Catalogue</div><h1>Catalogue Builder</h1><p>Select products, arrange your catalogue and print/save it as PDF.</p></div><div style="display:flex;gap:8px"><button class="secondary" onclick="catalogueSet=new Set(products.map(p=>String(p.id)));localStorage.setItem('ramoni_catalogue_selection',JSON.stringify([...catalogueSet]));render()">Select All</button><button class="primary" onclick="printCatalogue()">Generate PDF</button></div></div>
+ <div class="panel"><div class="panel-head"><h3>${selectedProducts.length} products selected</h3><button class="secondary" onclick="setView('products')">＋ Add Products</button></div>
+ <div class="products">${selectedProducts.length?selectedProducts.map(p=>productCard(p,true)).join(''):'<div class="empty">No products selected. Go to Products and select items for the catalogue.</div>'}</div></div>
+ <div id="printArea" class="hidden"></div>`;
+}
+function generic(title,sub){return `<div class="page-head"><div><div class="eyebrow">RAMONI Workspace</div><h1>${title}</h1><p>${sub}</p></div></div><div class="panel"><div class="empty" style="padding:70px">${title} module is ready for the next production data phase.<br><button class="primary" style="margin-top:16px" onclick="setView('products')">Open Products</button></div></div>`;}
+
+function render(){
+ content.innerHTML=view==='dashboard'?dashboard():view==='products'?productsView():view==='catalogue'?catalogueView():view==='categories'?generic('Categories','Organise your catalogue by product families.'):view==='brands'?generic('Brands','Manage brand identity and product ownership.'):view==='prices'?generic('Price List','Manage MRP and selling-price data.'):view==='customers'?generic('Customers','Keep customer and dealer records in one place.'):view==='enquiries'?generic('Enquiries','Track catalogue enquiries and follow-ups.'):view==='reports'?generic('Reports','Review catalogue and product activity.'):generic('Settings','Configure company, catalogue and administrator settings.');
+}
+
+function setView(v){view=v;document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));render();}
+function selectProduct(id){selected=products.find(p=>String(p.id)===String(id))||selected;render();}
+function editProduct(id){selected=products.find(p=>String(p.id)===String(id))||selected;openModal(true);}
+function openModal(edit=false){
+ document.getElementById('productModal').classList.add('show');document.querySelector('.modal-head h2').textContent=edit?'Edit Product':'Add Product';
+ const p=edit?selected:null;document.getElementById('fName').value=p?.name||'';document.getElementById('fModel').value=p?.model||'';document.getElementById('fCategory').value=p?.category||'Faucets';document.getElementById('fBrand').value=p?.brand||'RAMONI';document.getElementById('fSize').value=p?.size||'';document.getElementById('fFinish').value=p?.finish||'';document.getElementById('fPrice').value=p?.price||'';document.getElementById('fImage').value=p?.image||'';document.getElementById('fDesc').value=p?.desc||'';
+}
+function closeModal(){document.getElementById('productModal').classList.remove('show');}
 document.getElementById('closeModal').onclick=closeModal;document.getElementById('cancelModal').onclick=closeModal;
-document.getElementById('productForm').onsubmit=e=>{e.preventDefault();let data={name:fName.value,model:fModel.value,category:fCategory.value,brand:fBrand.value||'RAMONI',size:fSize.value,finish:fFinish.value,price:Number(fPrice.value||0),image:fImage.value,desc:fDesc.value};if(selected&&document.querySelector('.modal-head h2').textContent==='Edit Product'){Object.assign(selected,data)}else{selected={id:Date.now(),...data};products.unshift(selected)}save();closeModal();render()}
-document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>setView(b.dataset.view));document.getElementById('search').addEventListener('input',()=>render());
-function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}render();
-</script></body></html>
+document.getElementById('productForm').onsubmit=e=>{e.preventDefault();const data={name:fName.value.trim(),model:fModel.value.trim(),category:fCategory.value,brand:fBrand.value.trim()||'RAMONI',size:fSize.value.trim(),finish:fFinish.value.trim(),price:Number(fPrice.value||0),image:fImage.value.trim(),desc:fDesc.value.trim(),data_complete:Boolean(fName.value&&fModel.value&&fCategory.value&&fBrand.value&&fSize.value&&fFinish.value&&fPrice.value)};if(selected&&document.querySelector('.modal-head h2').textContent==='Edit Product')Object.assign(selected,data);else{selected={id:Date.now(),...data};products.unshift(selected)}saveLocal();closeModal();render();};
+
+function importExcel(){
+ let input=document.getElementById('excelInput');if(!input){input=document.createElement('input');input.type='file';input.id='excelInput';input.accept='.xlsx,.xls,.csv';input.style.display='none';document.body.appendChild(input);input.addEventListener('change',handleExcel);}
+ input.value='';input.click();
+}
+function handleExcel(e){
+ const file=e.target.files?.[0];if(!file)return;
+ const reader=new FileReader();
+ reader.onload=ev=>{
+  try{
+   const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+   const ws=wb.Sheets[wb.SheetNames[0]], rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+   let added=0;
+   rows.forEach((r,i)=>{
+    const name=String(r['Product Name']||r['Product Name *']||r['Name']||r['product_name']||Object.values(r)[0]||'').trim();if(!name)return;
+    const existing=products.find(p=>(p.name||'').toLowerCase()===name.toLowerCase()&&String(p.model||'').toLowerCase()===String(r['Model No.']||r['Model']||'').toLowerCase());
+    if(existing)return;
+    products.unshift({id:Date.now()+i,name,model:String(r['Model No.']||r['Model']||r['Product Code']||'').trim(),category:String(r['Category']||'').trim(),subcategory:String(r['Sub Category']||'').trim(),brand:String(r['Brand / Make']||r['Brand']||'RAMONI').trim(),size:String(r['Size / Dimensions']||r['Size']||'').trim(),material:String(r['Material']||'').trim(),finish:String(r['Finish']||'').trim(),price:Number(r['Selling Price (₹)']||r['Selling Price']||0)||0,mrp:Number(r['MRP (₹)']||r['MRP']||0)||0,stock:Number(r['Stock Qty']||r['Stock']||0)||0,image:String(r['Main Image']||r['Image']||'').trim(),desc:String(r['Short Description']||r['Detailed Description']||'').trim(),data_complete:false});added++;
+   });
+   saveLocal();cloudMessage=`${added} product names imported. You can now complete details one by one.`;setView('products');
+  }catch(err){alert('Excel import error: '+err.message);}
+ };
+ reader.readAsArrayBuffer(file);
+}
+function printCatalogue(){
+ const items=products.filter(p=>catalogueSet.has(String(p.id)));if(!items.length){alert('Please select at least one product.');return;}
+ const win=window.open('','_blank');if(!win){alert('Please allow pop-ups for RAMONI Catalogue.');return;}
+ win.document.write(`<!doctype html><html><head><title>RAMONI Catalogue</title><style>body{font-family:Arial;margin:0;color:#152238}.page{min-height:96vh;padding:36px;box-sizing:border-box;page-break-after:always}.cover{background:#071a33;color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}.cover h1{font-size:56px;letter-spacing:3px;margin:0}.cover p{font-size:20px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}.card{border:1px solid #ddd;border-radius:12px;padding:16px;break-inside:avoid}.photo{height:230px;background:#f4f6f8;display:flex;align-items:center;justify-content:center}.photo img{max-width:100%;max-height:100%;object-fit:contain}.photo span{font-size:64px;color:#b7c1ce}.model{color:#718096;font-size:13px}.price{font-size:20px;font-weight:700;margin-top:10px}.spec{margin-top:8px;font-size:12px}.back{text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center}</style></head><body><section class="page cover"><h1>RAMONI</h1><p>PREMIUM BATHROOM SOLUTION</p><p>Product Catalogue</p></section><section class="page"><h1>Product Catalogue</h1><div class="grid">${items.map(p=>`<article class="card"><div class="photo">${p.image?`<img src="${esc(p.image)}">`:'<span>◇</span>'}</div><h2>${esc(p.name)}</h2><div class="model">Model: ${esc(p.model||'—')}</div><div class="spec">Category: ${esc(p.category||'—')}</div><div class="spec">Size: ${esc(p.size||'—')} · Finish: ${esc(p.finish||'—')}</div><div class="price">${p.price?'₹'+Number(p.price).toLocaleString('en-IN'):'Price on request'}</div></article>`).join('')}</div></section><section class="page back"><h1>RAMONI</h1><p>Rajeshwar Sanitary Wares</p><p>Thank you</p></section></body></html>`);win.document.close();setTimeout(()=>win.print(),500);
+}
+
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+document.getElementById('search').addEventListener('input',()=>render());
+render();
+</script></script></body></html>
